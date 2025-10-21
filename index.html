@@ -1,60 +1,76 @@
-<script>
-  const CLIENT_ID = '158053251905-v472iagbsfl2m9jnv35c7j43tmgqf35i.apps.googleusercontent.com';
-  const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Gmail Viewer</title>
+</head>
+<body>
+  <h2>📧 Gmail Viewer</h2>
+  <button id="login">登入 Google</button>
+  <div id="emails"></div>
 
-  function startApp() {
-    gapi.load('client:auth2', async () => {
-      await gapi.client.init({
-        clientId: CLIENT_ID,
-        scope: SCOPES,
-        discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest']
+  <script>
+    const CLIENT_ID = '158053251905-v472iagbsfl2m9jnv35c7j43tmgqf35i.apps.googleusercontent.com';
+    const SCOPES = 'https://www.googleapis.com/auth/gmail.readonly';
+
+    function startApp() {
+      gapi.load('client:auth2', async () => {
+        await gapi.client.init({
+          clientId: CLIENT_ID,
+          scope: SCOPES,
+          discoveryDocs: ['https://www.googleapis.com/discovery/v1/apis/gmail/v1/rest']
+        });
+
+        document.getElementById('login').addEventListener('click', async () => {
+          const auth = gapi.auth2.getAuthInstance();
+          try {
+            await auth.signIn();
+            const token = auth.currentUser.get().getAuthResponse().access_token;
+            console.log("Access Token:", token);
+            await listEmails(token);
+          } catch (err) {
+            console.error('登入錯誤', err);
+            alert('登入失敗');
+          }
+        });
       });
+    }
 
-      document.getElementById('login').addEventListener('click', async () => {
-        const auth = gapi.auth2.getAuthInstance();
-        try {
-          await auth.signIn();
-          const token = auth.currentUser.get().getAuthResponse().access_token;
-          console.log("Access Token:", token);
-          await listEmails(token);
-        } catch (err) {
-          console.error('登入錯誤', err);
-          alert('登入失敗');
-        }
-      });
-    });
-  }
-
-  async function listEmails(token) {
-    try {
-      const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages', {
-        headers: { Authorization: 'Bearer ' + token }
-      });
-      const data = await res.json();
-      console.log('Response:', data);
-
-      if (data.error) {
-        alert('Gmail API 錯誤：' + data.error.message);
-        return;
-      }
-
-      const div = document.getElementById('emails');
-      div.innerHTML = '<h3>最近郵件：</h3>';
-      for (let m of (data.messages || []).slice(0, 5)) {
-        const msgRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}`, {
+    async function listEmails(token) {
+      try {
+        const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages', {
           headers: { Authorization: 'Bearer ' + token }
         });
-        const msgData = await msgRes.json();
-        const subject = msgData.payload.headers.find(h => h.name === 'Subject')?.value || '(無主題)';
-        div.innerHTML += `<p>${subject}</p>`;
-      }
-    } catch (err) {
-      console.error('Fetch 錯誤', err);
-    }
-  }
+        const data = await res.json();
+        console.log('Response:', data);
 
-  const script = document.createElement('script');
-  script.src = 'https://apis.google.com/js/api.js';
-  script.onload = startApp;
-  document.body.appendChild(script);
-</script>
+        if (data.error) {
+          alert('Gmail API 錯誤：' + data.error.message);
+          return;
+        }
+
+        const div = document.getElementById('emails');
+        div.innerHTML = '<h3>最近郵件：</h3>';
+        for (let m of (data.messages || []).slice(0, 5)) {
+          const msgRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${m.id}`, {
+            headers: { Authorization: 'Bearer ' + token }
+          });
+          const msgData = await msgRes.json();
+          const subject = msgData.payload.headers.find(h => h.name === 'Subject')?.value || '(無主題)';
+          div.innerHTML += `<p>${subject}</p>`;
+        }
+      } catch (err) {
+        console.error('Fetch 錯誤', err);
+      }
+    }
+
+    // 等 body 出現後再動態加載 Google API
+    window.onload = function () {
+      const script = document.createElement('script');
+      script.src = 'https://apis.google.com/js/api.js';
+      script.onload = startApp;
+      document.body.appendChild(script);
+    };
+  </script>
+</body>
+</html>
